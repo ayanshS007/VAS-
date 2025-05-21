@@ -33,6 +33,8 @@ def setup_toolbar(app, root):
     tk.Label(draw_tab, text="Line Style:").pack()
     tk.OptionMenu(draw_tab, app.line_style_var, "solid", "bold", "dashed", command=app.change_line_style).pack(pady=2)
     tk.Button(draw_tab, text="Pick Line Color", command=app.pick_line_color, width=15).pack(pady=2)
+    tk.Button(edit_tab, text="Eraser Tool", command=app.enable_eraser_mode, width=15).pack(pady=2)
+
 
     
 

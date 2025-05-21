@@ -102,6 +102,38 @@ class CanvasManager:
     def pick_line_color(self):
         color = colorchooser.askcolor()[1]
         if color: self.line_color = color
+        
+    
+    def enable_eraser_mode(self):
+        self.reset_modes()
+        self.eraser_mode = True
+        self.canvas.config(cursor="dotbox")  # Optional: change cursor for user feedback
+
+     # Bind the click event to the eraser handler
+        self.canvas.bind("<Button-1>", self.handle_eraser_click)
+
+    def handle_eraser_click(self, event):
+        x, y = event.x, event.y
+    # Find items under cursor (topmost last)
+        clicked_items = self.canvas.find_overlapping(x-5, y-5, x+5, y+5)
+        if clicked_items:
+            item_id = clicked_items[-1]
+            self.canvas.delete(item_id)
+            # Remove from actions_stack for undo support
+            self.actions_stack = [
+                [i for i in group if i != item_id]
+                for group in self.actions_stack
+            ]
+            self.actions_stack = [g for g in self.actions_stack if g]  # Remove empty groups
+
+        # Remove from furniture_items if present
+            if item_id in self.furniture_items:
+                del self.furniture_items[item_id]
+    # Optionally, you can turn off eraser mode after one erase:
+    # self.reset_modes()
+    # self.canvas.config(cursor="")
+
+    
 
     def enable_line_drawing(self):
         if self.drawing_enabled:
@@ -130,6 +162,11 @@ class CanvasManager:
         self.polygon_mode = False
         self.selected_furniture = None
         self.first_point = None
+        self.eraser_mode = False
+        self.canvas.config(cursor="")
+        self.canvas.unbind("<Button-1>")
+        self.canvas.bind("<Button-1>", self.handle_click)
+        
 
     def finish_polygon(self):
         if len(self.polygon_points) < 3: return
