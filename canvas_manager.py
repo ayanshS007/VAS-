@@ -7,8 +7,32 @@ from drawing_helpers import get_distance_label
 from toolbar import setup_toolbar
 import math
 from Furniture import Furniture
+import os
+from PIL import ImageGrab
+
+
 class CanvasManager:
+    
     def __init__(self, root):
+        # self.selected_icon = None
+        self.icon_font_size = 20  # default emoji size
+        self.emoji_map = {
+         "Bed": "🛏️",
+         "Chair": "🪑",
+         "Table": "🛋️",
+          "Door": "🚪",
+         "Toilet": "🚽",
+          "Shower": "🚿",
+          "Sink": "🧼",
+          "Dining": "🍽️",
+          "Stove": "🔥",
+          "Fridge": "🧊",
+          "Computer": "🖥️",
+           "TV": "📺",
+           "Storage": "📦",
+           "Window": "🪟"
+       }
+
         self.root = root
         self.root.title("Graph Paper Layout Tool")
 
@@ -129,10 +153,59 @@ class CanvasManager:
         if self.actions_stack:
             for item in self.actions_stack.pop():
                 self.canvas.delete(item)
-
     def save_canvas(self):
-        path = filedialog.asksaveasfilename(defaultextension=".ps", filetypes=[("PostScript", "*.ps")])
-        if path: self.canvas.postscript(file=path)
+        filetypes = [
+            ("PostScript", "*.ps"),
+            ("PNG Image", "*.png"),
+            ("JPEG Image", "*.jpg"),
+            ("PDF Document", "*.pdf")
+            ]
+        
+        path = filedialog.asksaveasfilename(
+            defaultextension=".ps",
+            filetypes=filetypes,
+            title="Save As"
+            )
+        
+        if not path:
+            return
+
+        if path.lower().endswith('.ps'):
+            self.canvas.postscript(file=path, colormode='color')
+            
+        elif path.lower().endswith(('.png', '.jpg', '.jpeg')):
+            # Capture visible canvas area using screenshot
+            x = self.root.winfo_rootx() + self.canvas.winfo_x()
+            y = self.root.winfo_rooty() + self.canvas.winfo_y()
+            x1 = x + self.canvas.winfo_width()
+            y1 = y + self.canvas.winfo_height()
+            
+            ImageGrab.grab(bbox=(x, y, x1, y1)).save(path)
+            
+        elif path.lower().endswith('.pdf'):
+            temp_ps = "temp.ps"
+            self.canvas.postscript(file=temp_ps, colormode='color')
+        
+        try:
+            # Use system's ps2pdf command
+            import subprocess
+            subprocess.run([
+                'gs',
+                '-q',
+                '-dNOPAUSE',
+                '-dBATCH',
+                '-sDEVICE=pdfwrite',
+                f'-sOutputFile={path}',
+                temp_ps
+            ], check=True)
+        except subprocess.CalledProcessError as e:
+            print(f"PDF conversion failed: {e}")
+        finally:
+            if os.path.exists(temp_ps):
+                os.remove(temp_ps)
+    # def save_canvas(self):
+    #     path = filedialog.asksaveasfilename(defaultextension=".ps", filetypes=[("PostScript", "*.ps")])
+    #     if path: self.canvas.postscript(file=path)
 
     def handle_click(self, event):
         x, y = event.x, event.y
@@ -155,6 +228,8 @@ class CanvasManager:
                 
                 # Create label with distance
                 label_text, mid_x, mid_y = get_distance_label(x0, y0, x, y, self.unit)
+                # label = self.canvas.create_text(x, y, text=icon, font=("Arial", self.icon_font_size))
+
                 label = self.canvas.create_text(mid_x, mid_y - 10, text=label_text, font=("Arial", 8))
                 
                 # Create second point at end of line
@@ -170,7 +245,10 @@ class CanvasManager:
                 if self.current_line_label: 
                     self.canvas.delete(self.current_line_label)
                     self.current_line_label = None
-
+                clicked_items = self.canvas.find_overlapping(x-5, y-5, x+5, y+5)
+                if clicked_items:
+                    self.dragging_item = clicked_items[-1]
+                    self.selected_icon = self.dragging_item
         elif self.polygon_mode:
             if self.polygon_points:
                 if math.dist((x, y), self.polygon_points[0]) < 10:
@@ -191,8 +269,10 @@ class CanvasManager:
                     self.canvas.coords(info[2], x, y)
                     self.furniture_items[item_id] = (x, y, info[2])
                     return
-            rect = self.canvas.create_rectangle(x-15, y-15, x+15, y+15, fill="orange")
-            label = self.canvas.create_text(x, y, text=self.selected_furniture, font=("Arial", 7))
+            icon = self.emoji_map.get(self.selected_furniture, self.selected_furniture)
+            label = self.canvas.create_text(x, y, text=icon, font=("Arial", 20))
+            rect = self.canvas.create_rectangle(x-20, y-20, x+20, y+20, outline="gray", dash=(2, 2))
+            # self.furniture_items[rect] = (x, y, label, self.icon_font_size)
             self.furniture_items[rect] = (x, y, label)
             self.actions_stack.append([rect, label])
         
@@ -233,7 +313,9 @@ class CanvasManager:
         if self.dragging_item in self.furniture_items:
             label_id = self.furniture_items[self.dragging_item][2]
             self.canvas.move(label_id, dx, dy)
+            # ix, iy, label_id, font_size = self.furniture_items[self.dragging_item]
             ix, iy, _ = self.furniture_items[self.dragging_item]
+            # self.furniture_items[self.dragging_item] = (ix + dx, iy + dy, label_id, font_size)
             self.furniture_items[self.dragging_item] = (ix + dx, iy + dy, label_id)
 
         self.drag_start_pos = (x, y)
@@ -244,3 +326,29 @@ class CanvasManager:
         # Unbind the drag events to avoid conflicts
         self.canvas.unbind("<B1-Motion>")
         self.canvas.unbind("<ButtonRelease-1>")
+    def zoom_in_furniture(self):
+     self.icon_font_size += 2
+     self.update_furniture_sizes()
+    def zoom_out_furniture(self):
+     if self.icon_font_size > 6:
+        self.icon_font_size -= 2
+        self.update_furniture_sizes()
+    def update_furniture_sizes(self):
+       for _, (x, y, label_id) in self.furniture_items.items():
+        icon = self.canvas.itemcget(label_id, "text")
+        self.canvas.itemconfig(label_id, font=("Arial", self.icon_font_size))
+        self.canvas.coords(label_id, x, y)
+
+    # def increase_selected_icon_size(self):
+    #    if self.selected_icon and self.selected_icon in self.furniture_items:
+    #       x, y, label_id, font_size = self.furniture_items[self.selected_icon]
+    #       font_size += 2
+    #       self.canvas.itemconfig(label_id, font=("Arial", font_size))
+    #       self.furniture_items[self.selected_icon] = (x, y, label_id, font_size)
+    # def decrease_selected_icon_size(self):
+    #     if self.selected_icon and self.selected_icon in self.furniture_items:
+    #      x, y, label_id, font_size = self.furniture_items[self.selected_icon]
+    #     if font_size > 6:
+    #         font_size -= 2
+    #         self.canvas.itemconfig(label_id, font=("Arial", font_size))
+    #         self.furniture_items[self.selected_icon] = (x, y, label_id, font_size)

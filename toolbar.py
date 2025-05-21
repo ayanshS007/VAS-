@@ -46,5 +46,14 @@ def setup_toolbar(app, root):
     tk.Button(view_tab, text="Save Canvas", command=app.save_canvas, width=15).pack(pady=2)
 
     tk.Label(view_tab, text="Furniture:").pack()
-    tk.OptionMenu(view_tab, app.furniture_var, "Bed", "Table", "Chair", "Sofa").pack(pady=2)
+    furniture_options = [
+    "Bed", "Chair", "Table", "Door", "Toilet", "Shower", "Sink",
+    "Dining", "Stove", "Fridge", "Computer", "TV", "Storage", "Window"
+     ]
+    tk.OptionMenu(view_tab, app.furniture_var, *furniture_options).pack(pady=2)
+    # tk.OptionMenu(view_tab, app.furniture_var, "Bed", "Table", "Chair", "Door").pack(pady=2)
     tk.Button(view_tab, text="Place Furniture", command=app.enable_furniture_mode, width=15).pack(pady=2)
+    # tk.Button(view_tab, text="Increase Icon Size", command=app.increase_selected_icon_size).pack(pady=2)
+    # tk.Button(view_tab, text="Decrease Icon Size", command=app.decrease_selected_icon_size).pack(pady=2)
+    tk.Button(view_tab, text="Zoom In Furniture", command=app.zoom_in_furniture).pack(pady=2)
+    tk.Button(view_tab, text="Zoom Out Furniture", command=app.zoom_out_furniture).pack(pady=2)
