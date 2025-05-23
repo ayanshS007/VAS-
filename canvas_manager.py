@@ -8,31 +8,19 @@ from toolbar import setup_toolbar
 import math
 from Furniture import Furniture
 import os
-from PIL import ImageGrab
+from PIL import ImageGrab,Image, ImageTk
 
 
 class CanvasManager:
     
     def __init__(self, root):
-        # self.selected_icon = None
-        self.icon_font_size = 20  # default emoji size
-        self.emoji_map = {
-         "Bed": "🛏️",
-         "Chair": "🪑",
-         "Table": "🛋️",
-          "Door": "🚪",
-         "Toilet": "🚽",
-          "Shower": "🚿",
-          "Sink": "🧼",
-          "Dining": "🍽️",
-          "Stove": "🔥",
-          "Fridge": "🧊",
-          "Computer": "🖥️",
-           "TV": "📺",
-           "Storage": "📦",
-           "Window": "🪟"
-       }
-
+        
+        self.furniture_images = {}  # Stores PhotoImage references
+        self.furniture_image_dir = "images/"  # Your JPG directory
+        self.selected_furniture_obj = None  # Track selected furniture
+        
+        self.continuous_placement = False
+        
         self.root = root
         self.root.title("Graph Paper Layout Tool")
 
@@ -129,6 +117,14 @@ class CanvasManager:
         # Remove from furniture_items if present
             if item_id in self.furniture_items:
                 del self.furniture_items[item_id]
+            if clicked_items:
+                item_id = clicked_items[-1]
+            # Add this block to handle furniture deletion
+            if item_id in self.furniture_items:
+                furniture = self.furniture_items[item_id]
+                furniture.delete()
+                del self.furniture_items[item_id]
+        
     # Optionally, you can turn off eraser mode after one erase:
     # self.reset_modes()
     # self.canvas.config(cursor="")
@@ -151,22 +147,26 @@ class CanvasManager:
             self.polygon_points = []
 
     def enable_furniture_mode(self):
-        if self.selected_furniture == self.furniture_var.get():
-            self.reset_modes()
-        else:
-            self.reset_modes()
-            self.selected_furniture = self.furniture_var.get()
+        self.reset_modes()
+        self.selected_furniture = self.furniture_var.get()  # Always enable mode on button press
+        self.canvas.config(cursor="crosshair")  # Visual feedback
 
-    def reset_modes(self): 
-        self.drawing_enabled = False
-        self.polygon_mode = False
-        self.selected_furniture = None
-        self.first_point = None
-        self.eraser_mode = False
-        self.canvas.config(cursor="")
-        self.canvas.unbind("<Button-1>")
-        self.canvas.bind("<Button-1>", self.handle_click)
-        
+    def toggle_continuous_placement(self):
+        self.continuous_placement = not self.continuous_placement
+        status = "ON" if self.continuous_placement else "OFF"
+        print(f"Continuous placement: {status}")  # Optional feedback
+
+    def reset_modes(self):
+        def reset_modes(self):
+            self.drawing_enabled = False
+            self.polygon_mode = False
+            self.selected_furniture = None
+            self.first_point = None
+            self.eraser_mode = False
+            self.canvas.config(cursor="")
+            self.canvas.unbind("<B1-Motion>")
+            self.canvas.unbind("<ButtonRelease-1>")
+
 
     def finish_polygon(self):
         if len(self.polygon_points) < 3: return
@@ -265,8 +265,6 @@ class CanvasManager:
                 
                 # Create label with distance
                 label_text, mid_x, mid_y = get_distance_label(x0, y0, x, y, self.unit)
-                # label = self.canvas.create_text(x, y, text=icon, font=("Arial", self.icon_font_size))
-
                 label = self.canvas.create_text(mid_x, mid_y - 10, text=label_text, font=("Arial", 8))
                 
                 # Create second point at end of line
@@ -286,6 +284,7 @@ class CanvasManager:
                 if clicked_items:
                     self.dragging_item = clicked_items[-1]
                     self.selected_icon = self.dragging_item
+
         elif self.polygon_mode:
             if self.polygon_points:
                 if math.dist((x, y), self.polygon_points[0]) < 10:
@@ -299,33 +298,94 @@ class CanvasManager:
             self.actions_stack.append([point])
 
         elif self.selected_furniture:
-            for item_id, info in self.furniture_items.items():
-                ix, iy, _ = info
-                if abs(ix - x) < 20 and abs(iy - y) < 20:
-                    self.canvas.coords(item_id, x-15, y-15, x+15, y+15)
-                    self.canvas.coords(info[2], x, y)
-                    self.furniture_items[item_id] = (x, y, info[2])
-                    return
-            icon = self.emoji_map.get(self.selected_furniture, self.selected_furniture)
-            label = self.canvas.create_text(x, y, text=icon, font=("Arial", 20))
-            rect = self.canvas.create_rectangle(x-20, y-20, x+20, y+20, outline="gray", dash=(2, 2))
-            # self.furniture_items[rect] = (x, y, label, self.icon_font_size)
-            self.furniture_items[rect] = (x, y, label)
-            self.actions_stack.append([rect, label])
-        
+            clicked_furniture = None
+            for item_id, furniture_obj in self.furniture_items.items():
+                if furniture_obj.is_clicked(x, y):
+                    clicked_furniture = furniture_obj
+                    break
+
+            if clicked_furniture:
+                if not self.continuous_placement:  # New condition
+                    self.handle_furniture_select(clicked_furniture)
+            else:
+                # Place new furniture
+                image_path = os.path.join("images", f"{self.selected_furniture}.jpg")
+                if os.path.exists(image_path):
+                    furniture = Furniture(
+                        self.canvas, 
+                        image_path,
+                        x, y,
+                        self.handle_furniture_select
+                    )
+                    self.furniture_items[furniture.image_id] = furniture
+                    self.actions_stack.append([furniture.image_id])
+            # Check if clicking on existing furniture to move it
+            moved_existing = False
+            for item_id, furniture_obj in self.furniture_items.items():
+                if furniture_obj.is_clicked(x, y):
+                    furniture_obj.set_position(x, y)
+                    moved_existing = True
+                    break
+            
+            if not moved_existing:
+                # Create new furniture ONLY if not moving existing
+                image_path = os.path.join("images", f"{self.selected_furniture}.jpg")
+                if os.path.exists(image_path):
+                    furniture = Furniture(
+                        self.canvas, 
+                        image_path,
+                        x, y,
+                        self.handle_furniture_select
+                    )
+                    self.furniture_items[furniture.image_id] = furniture
+                    self.actions_stack.append([furniture.image_id])
         else:
             # Check if clicked near any canvas item to start dragging
             clicked_items = self.canvas.find_overlapping(x-5, y-5, x+5, y+5)
             if clicked_items:
-                # Pick the topmost item under cursor
                 self.dragging_item = clicked_items[-1]
                 self.drag_start_pos = (x, y)
-                # Bind mouse motion and release for dragging
                 self.canvas.bind("<B1-Motion>", self.handle_drag)
                 self.canvas.bind("<ButtonRelease-1>", self.handle_release)
+            
+            if not any(item in self.furniture_items for item in clicked_items):
+                self.deselect_furniture()
             else:
                 self.dragging_item = None
+        if not self.continuous_placement:
+            self.reset_modes()
+            self.deselect_furniture()
 
+    
+    def handle_furniture_select(self, furniture_obj): 
+        if self.selected_furniture_obj:
+            self.selected_furniture_obj.delete_handles()
+        self.selected_furniture_obj = furniture_obj
+        furniture_obj.draw_handles()
+        
+        # Bring to front
+        self.canvas.tag_raise(furniture_obj.image_id)
+
+
+    def load_furniture_image(self, furniture_type):
+        if furniture_type in self.furniture_images:
+            return self.furniture_images[furniture_type]
+        
+        path = os.path.join(self.furniture_image_dir, f"{furniture_type}.jpg")
+        if os.path.exists(path):
+            img = Image.open(path)
+            img = img.resize((40, 40), Image.LANCZOS)  # Initial size
+            photo_img = ImageTk.PhotoImage(img)
+            self.furniture_images[furniture_type] = photo_img
+            return photo_img
+        return None
+
+    def deselect_furniture(self):
+        if self.selected_furniture_obj:
+            self.selected_furniture_obj.delete_handles()
+            self.selected_furniture_obj = None
+
+    
     def preview_drawing(self, event):
         if self.drawing_enabled and self.first_point:
             x0, y0 = self.first_point
@@ -363,6 +423,7 @@ class CanvasManager:
         # Unbind the drag events to avoid conflicts
         self.canvas.unbind("<B1-Motion>")
         self.canvas.unbind("<ButtonRelease-1>")
+        
     def zoom_in_furniture(self):
      self.icon_font_size += 2
      self.update_furniture_sizes()
@@ -370,12 +431,7 @@ class CanvasManager:
      if self.icon_font_size > 6:
         self.icon_font_size -= 2
         self.update_furniture_sizes()
-    def update_furniture_sizes(self):
-       for _, (x, y, label_id) in self.furniture_items.items():
-        icon = self.canvas.itemcget(label_id, "text")
-        self.canvas.itemconfig(label_id, font=("Arial", self.icon_font_size))
-        self.canvas.coords(label_id, x, y)
-
+        
     # def increase_selected_icon_size(self):
     #    if self.selected_icon and self.selected_icon in self.furniture_items:
     #       x, y, label_id, font_size = self.furniture_items[self.selected_icon]

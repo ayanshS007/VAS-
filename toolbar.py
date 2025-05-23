@@ -46,7 +46,9 @@ def setup_toolbar(app, root):
 
     # === VIEW TAB ===
     tk.Button(view_tab, text="Save Canvas", command=app.save_canvas, width=15).pack(pady=2)
-
+    ttk.Checkbutton(view_tab, text="Continuous Placement",command=app.toggle_continuous_placement).pack(pady=2)
+    # In setup_toolbar (toolbar.py)
+    notebook.add(view_tab, text="View")
     tk.Label(view_tab, text="Furniture:").pack()
     furniture_options = [
     "Bed", "Chair", "Table", "Door", "Toilet", "Shower", "Sink",
@@ -59,3 +61,4 @@ def setup_toolbar(app, root):
     # tk.Button(view_tab, text="Decrease Icon Size", command=app.decrease_selected_icon_size).pack(pady=2)
     tk.Button(view_tab, text="Zoom In Furniture", command=app.zoom_in_furniture).pack(pady=2)
     tk.Button(view_tab, text="Zoom Out Furniture", command=app.zoom_out_furniture).pack(pady=2)
+    

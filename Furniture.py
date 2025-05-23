@@ -134,6 +134,12 @@ class Furniture:
     def delete(self):
         self.delete_handles()
         self.canvas.delete(self.image_id)
+    
+    def is_clicked(self, x, y):
+        """Check if click is within furniture bounds"""
+        x0, y0 = self.x - self.width/2, self.y - self.height/2
+        x1, y1 = self.x + self.width/2, self.y + self.height/2
+        return x0 <= x <= x1 and y0 <= y <= y1
 
 
 class GraphLayoutApp:
@@ -208,9 +214,9 @@ class GraphLayoutApp:
             self.selected_item.delete()
             self.furniture_items.remove(self.selected_item)
             self.selected_item = None
-
-
+    
 if __name__ == "__main__":
     root = tk.Tk()
     app = GraphLayoutApp(root)
     root.mainloop()
+    
