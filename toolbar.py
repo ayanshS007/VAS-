@@ -62,6 +62,8 @@ def setup_toolbar(app, root):
     ctk.CTkOptionMenu(edit_tab, variable=app.unit_var, 
                      values=list(app.unit_scale.keys()), 
                      command=app.change_unit).pack(pady=2)
+    ctk.CTkButton(edit_tab, text="Reset Mode", command=app.reset_modes).pack(pady=2)
+
 
     # === Furniture Tab ===
     # ctk.CTkLabel(furniture_tab, text="Furniture Controls").pack(pady=5)
