@@ -5,6 +5,15 @@ import os
 
 HANDLE_SIZE = 8
 
+def find_image_path(name):
+    """Find the path for the furniture image, supporting .png and .jpeg."""
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    for ext in ('png', 'jpeg', 'jpg'):
+        path = os.path.join(base_dir, "Image", f"{name}.{ext}")
+        if os.path.exists(path):
+            return path
+    return None
+
 class Furniture:
     def __init__(self, canvas, image_path, x, y, select_callback):
         self.canvas = canvas
@@ -13,7 +22,6 @@ class Furniture:
         self.scale = 1.0
         self.update_image()
         self.image_id = self.canvas.create_image(x, y, image=self.tk_image, anchor="center")
-
         self.select_callback = select_callback
 
         self.canvas.tag_bind(self.image_id, "<ButtonPress-1>", self.start_drag)
@@ -72,8 +80,10 @@ class Furniture:
         x, y = self.get_position()
         w, h = self.current_size
         half_w, half_h = w / 2, h / 2
-        positions = [(x - half_w, y - half_h), (x + half_w, y - half_h),
-                     (x + half_w, y + half_h), (x - half_w, y + half_h)]
+        positions = [
+            (x - half_w, y - half_h), (x + half_w, y - half_h),
+            (x + half_w, y + half_h), (x - half_w, y + half_h)
+        ]
         for i, (hx, hy) in enumerate(positions):
             handle = self.canvas.create_rectangle(
                 hx - HANDLE_SIZE//2, hy - HANDLE_SIZE//2,
@@ -97,12 +107,14 @@ class Furniture:
         x, y = self.get_position()
         w, h = self.current_size
         half_w, half_h = w / 2, h / 2
-        positions = [(x - half_w, y - half_h), (x + half_w, y - half_h),
-                     (x + half_w, y + half_h), (x - half_w, y + half_h)]
+        positions = [
+            (x - half_w, y - half_h), (x + half_w, y - half_h),
+            (x + half_w, y + half_h), (x - half_w, y + half_h)
+        ]
         for i, (hx, hy) in enumerate(positions):
             self.canvas.coords(self.handles[i],
-                               hx - HANDLE_SIZE//2, hy - HANDLE_SIZE//2,
-                               hx + HANDLE_SIZE//2, hy + HANDLE_SIZE//2)
+                hx - HANDLE_SIZE//2, hy - HANDLE_SIZE//2,
+                hx + HANDLE_SIZE//2, hy + HANDLE_SIZE//2)
 
     def start_handle_drag(self, event, handle_index):
         self.handle_dragging = True
@@ -117,11 +129,9 @@ class Furniture:
         dy = event.y - self.last_mouse[1]
         w, h = self.current_size
         base_img = self.original_image.rotate(self.angle, expand=True)
-
         scale_x = (w + dx * 2) / base_img.width if self.handle_index in [1, 2] else (w - dx * 2) / base_img.width
         scale_y = (h + dy * 2) / base_img.height if self.handle_index in [2, 3] else (h - dy * 2) / base_img.height
         self.scale = max(0.1, (scale_x + scale_y) / 2)
-
         self.update_image()
         self.canvas.itemconfig(self.image_id, image=self.tk_image)
         self.set_position(x + dx / 2, y + dy / 2)
@@ -134,70 +144,73 @@ class Furniture:
     def delete(self):
         self.delete_handles()
         self.canvas.delete(self.image_id)
-    
-    def is_clicked(self, x, y):
-        """Check if click is within furniture bounds"""
-        x0, y0 = self.x - self.width/2, self.y - self.height/2
-        x1, y1 = self.x + self.width/2, self.y + self.height/2
-        return x0 <= x <= x1 and y0 <= y <= y1
 
+    def apply_global_zoom(self, zoom_level):
+        self.scale = zoom_level
+        self.update_image()
+        self.canvas.itemconfig(self.image_id, image=self.tk_image)
+        self.update_handles_position()
 
 class GraphLayoutApp:
     def __init__(self, root):
         self.root = root
         root.title("2D Home Layout with Furniture")
-
         self.main_frame = tk.Frame(root)
         self.main_frame.pack(fill="both", expand=True)
-
         self.sidebar = tk.Frame(self.main_frame, width=200, bg="#f0f0f0")
         self.sidebar.pack(side="left", fill="y")
-
         self.canvas = tk.Canvas(self.main_frame, bg="white")
         self.canvas.pack(side="right", fill="both", expand=True)
         self.canvas.bind("<Configure>", self.draw_grid)
         self.canvas.bind("<Button-1>", self.canvas_click)
-
         self.grid_size = 20
+        self.zoom_level = 1.0
         self.furniture_items = []
         self.selected_item = None
-        self.selected_furniture_name = "bed"
-
-        self.furniture_list = ["bed", "sofa", "chair", "table", "almirah", "door"]
+        self.selected_furniture_name = "double_bed"
+        self.canvas.bind("<MouseWheel>", self.on_zoom_windows)
+        # List your furniture names here (without extension)
+        self.furniture_list = [
+            "double_bed", "single_bed", "dining_table_8_seat","Toilet","sofa"
+        ]
         self.image_thumbnails = {}
 
         tk.Label(self.sidebar, text="Select Furniture", bg="#f0f0f0").pack(pady=5)
         for name in self.furniture_list:
-            path = f"images/{name}.png"
-            if os.path.exists(path):
+            path = find_image_path(name)
+            if path:
                 image = Image.open(path).resize((40, 40))
                 thumb = ImageTk.PhotoImage(image)
                 self.image_thumbnails[name] = thumb
-                btn = tk.Button(self.sidebar, image=thumb, text=name.capitalize(),
+                btn = tk.Button(self.sidebar, image=thumb, text=name.replace("_", " ").title(),
                                 compound="top", command=lambda n=name: self.set_selected_furniture(n))
                 btn.pack(pady=5, padx=10)
-
         tk.Button(self.sidebar, text="Rotate", command=self.rotate_selected).pack(pady=10)
         tk.Button(self.sidebar, text="Delete", command=self.delete_selected).pack(pady=5)
+        tk.Button(self.sidebar, text="Zoom In (+)", command=lambda: self.zoom_by(1.1)).pack(pady=5)
+        tk.Button(self.sidebar, text="Zoom Out (-)", command=lambda: self.zoom_by(1 / 1.1)).pack(pady=5)
 
     def draw_grid(self, event=None):
         self.canvas.delete("grid_line")
         width = self.canvas.winfo_width()
         height = self.canvas.winfo_height()
-        for i in range(0, width, self.grid_size):
+        scaled_grid = int(self.grid_size * self.zoom_level)
+        for i in range(0, width, scaled_grid):
             self.canvas.create_line(i, 0, i, height, fill="#e0e0e0", tags="grid_line")
-        for i in range(0, height, self.grid_size):
+        for i in range(0, height, scaled_grid):
             self.canvas.create_line(0, i, width, i, fill="#e0e0e0", tags="grid_line")
 
     def set_selected_furniture(self, name):
         self.selected_furniture_name = name
 
     def canvas_click(self, event):
-        path = f"images/{self.selected_furniture_name}.png"
-        if os.path.exists(path):
+        path = find_image_path(self.selected_furniture_name)
+        if path:
             item = Furniture(self.canvas, path, event.x, event.y, self.select_item)
             self.furniture_items.append(item)
             self.select_item(item)
+        else:
+            print(f"Image not found for {self.selected_furniture_name}")
 
     def select_item(self, item):
         if self.selected_item:
@@ -212,11 +225,30 @@ class GraphLayoutApp:
     def delete_selected(self):
         if self.selected_item:
             self.selected_item.delete()
-            self.furniture_items.remove(self.selected_item)
+            if self.selected_item in self.furniture_items:
+                self.furniture_items.remove(self.selected_item)
             self.selected_item = None
-    
-if __name__ == "__main__":
-    root = tk.Tk()
-    app = GraphLayoutApp(root)
-    root.mainloop()
-    
+
+    def zoom_by(self, factor):
+        self.zoom_level *= factor
+        self.zoom_level = max(0.2, min(self.zoom_level, 5.0))
+        for item in self.furniture_items:
+            item.apply_global_zoom(self.zoom_level)
+        self.draw_grid()
+
+    def on_zoom_windows(self, event):
+        if event.delta > 0:
+            self.zoom_level *= 1.1
+        else:
+            self.zoom_level /= 1.1
+        self.zoom_level = max(0.2, min(self.zoom_level, 5.0))
+        for item in self.furniture_items:
+            item.apply_global_zoom(self.zoom_level)
+        self.draw_grid()
+
+# if __name__ == "__main__":
+#     root = tk.Tk()
+#     app = GraphLayoutApp(root)
+#     root.geometry("900x600")
+#     root.mainloop()
+
