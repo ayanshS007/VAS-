@@ -503,7 +503,11 @@ class CanvasManager:
         for item_id in reversed(overlapping):
             item_type = self.canvas.type(item_id)
             tags = self.canvas.gettags(item_id)
-            if item_type == "polygon" or "closed_shape" in tags:
+            if (
+            item_type == "polygon"
+            or "closed_shape" in tags
+            or (item_type == "rectangle" and "room" in tags)
+        ):
                 self.canvas.itemconfig(item_id, fill=self.fill_color)
                 self.actions_stack.append([item_id])
                 break
@@ -558,7 +562,7 @@ class CanvasManager:
      self.group_id_counter += 1
 
      # Draw rectangle and label, with same unique tag
-     rect = self.canvas.create_rectangle(x0, y0, x1, y1, fill="#d0f0c0", outline="black", tags=(group_tag,))
+     rect = self.canvas.create_rectangle(x0, y0, x1, y1, fill="#d0f0c0", outline="black", tags=(group_tag,"room"))
      label = self.canvas.create_text((x0 + x1) / 2, (y0 + y1) / 2,
                                     text=f"{name}\n{width_m}×{height_m} m", font=("Arial", 10),
                                     tags=(group_tag,))
