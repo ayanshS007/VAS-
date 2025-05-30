@@ -66,10 +66,6 @@ def setup_toolbar(app, root):
 
 
     # === Furniture Tab ===
-    # ctk.CTkLabel(furniture_tab, text="Furniture Controls").pack(pady=5)
-    # Add image buttons for furniture
-    # === Furniture Tab (Alternative) ===
-    # === Furniture Tab ===
     import tkinter as tk
     from tkinter import Menu, Menubutton
     from Furniture import find_image_path
