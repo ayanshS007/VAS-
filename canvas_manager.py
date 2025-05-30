@@ -55,7 +55,7 @@ class CanvasManager:
 
 
         # Image furniture system
-        self.image_furniture_list = ["double_bed", "single_bed", "dining_table_8_seat","Toilet","sofa","Chair","Bath Tub","Toiler_room1","Bathroom_layout1"]
+        self.image_furniture_list = ["double_bed", "single_bed", "dining_table_8_seat","Toilet","sofa","Chair","Bath Tub","Toiler_room1","Bathroom_layout1","doublehand_door","singlehand_door"]
         self.selected_image_furniture = None
         self.image_furniture_items = []
         self.selected_image_item = None
