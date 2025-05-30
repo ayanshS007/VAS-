@@ -165,6 +165,13 @@ def setup_toolbar(app, root):
         print("⚠️ Please enter valid numbers.")
 
     ctk.CTkButton(view_tab, text="Create Room", command=create_room_from_sidebar).pack(pady=5)
+    
+    
+    # trying to add open option
+    # === View Tab ===
+    ctk.CTkButton(view_tab, text="Open Image", command=app.load_background_image).pack(pady=2)
+    
+
 
 
 

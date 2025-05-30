@@ -6,7 +6,7 @@ from geometry import calculate_polygon_area, calculate_polygon_perimeter
 from drawing_helpers import get_distance_label
 from toolbar import setup_toolbar
 from Furniture import Furniture, find_image_path
-from PIL import ImageGrab
+from PIL import ImageGrab,Image,ImageTk
 import os
 
 class CanvasManager:
@@ -77,6 +77,14 @@ class CanvasManager:
         self.drag_start_pos = None
         self.grid_visible = False
         self.grid_lines = []
+        
+# Open logic 
+        self.bg_image_id = None
+        self.tk_bg_image = None  # Prevents garbage collection
+
+
+        
+
 
         # Sidebar for image furniture
         # self._setup_image_furniture_sidebar(left_panel)
@@ -592,6 +600,49 @@ class CanvasManager:
 
     def end_drag_room(self, event):
      self.dragged_items = None
+     
+     
+     
+    
+    
+# trying to add open logic
+    def load_background_image(self):
+        file_path = filedialog.askopenfilename(
+            filetypes=[("Image Files", "*.png *.jpg *.jpeg")]
+        )
+        if not file_path:
+            return
+        
+        # Clear existing background
+        if hasattr(self, 'bg_image_id'):
+            self.canvas.delete(self.bg_image_id)
+        
+        # Open and resize image
+        img = Image.open(file_path)
+        img = self._scale_image_to_canvas(img)
+        self.tk_bg_image = ImageTk.PhotoImage(img)
+        
+        # Center on canvas
+        x = self.canvas_width // 2
+        y = self.canvas_height // 2
+        self.bg_image_id = self.canvas.create_image(x, y, image=self.tk_bg_image)
+
+    def _scale_image_to_canvas(self, img):
+        # Maintain aspect ratio while fitting to canvas
+        canvas_ratio = self.canvas_width / self.canvas_height
+        img_ratio = img.width / img.height
+        
+        if img_ratio > canvas_ratio:
+            # Width is limiting factor
+            new_width = self.canvas_width
+            new_height = int(new_width / img_ratio)
+        else:
+            # Height is limiting factor
+            new_height = self.canvas_height
+            new_width = int(new_height * img_ratio)
+        
+        return img.resize((new_width, new_height), Image.LANCZOS)
+
 
 
     # def resize_room(self, event, rect_id, label_id, handle_id):
