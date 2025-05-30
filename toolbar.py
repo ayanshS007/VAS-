@@ -68,23 +68,82 @@ def setup_toolbar(app, root):
     # === Furniture Tab ===
     # ctk.CTkLabel(furniture_tab, text="Furniture Controls").pack(pady=5)
     # Add image buttons for furniture
+    # === Furniture Tab (Alternative) ===
+    # === Furniture Tab ===
+    import tkinter as tk
+    from tkinter import Menu, Menubutton
     from Furniture import find_image_path
     from PIL import Image, ImageTk
 
+    # Organize furniture into categories
+    furniture_categories = {
+        "Beds": ["double_bed", "single_bed"],
+        "Bathroom": ["Toilet", "Bath Tub", "Toiler_room1", "Bathroom_layout1"],
+        "Common Furniture": ["dining_table_8_seat", "sofa", "Chair"],
+        "Doors": ["doublehand_door", "singlehand_door"]
+    }
+
+    # Load images for all furniture items
     image_thumbnails = {}
-    for name in app.image_furniture_list:
-     ctk.CTkButton(furniture_tab, text=name.replace("_", " ").title(),
-                  command=lambda n=name: app.set_selected_image_furniture(n)).pack(pady=5, padx=10)
+    for category, items in furniture_categories.items():
+        for name in items:
+            path = find_image_path(name)
+            if path:
+                img = Image.open(path).resize((40, 40))
+                thumb = ImageTk.PhotoImage(img)
+                image_thumbnails[name] = thumb
+
+    # Create dropdown for each category
+    for category, items in furniture_categories.items():
+        # Create a frame for each category
+        category_frame = ctk.CTkFrame(furniture_tab)
+        category_frame.pack(pady=5, padx=10, fill="x")
+        
+        # Category label
+        ctk.CTkLabel(category_frame, text=category, font=("Arial", 12, "bold")).pack(pady=(5,0))
+        
+        # Create menubutton with dropdown
+        mbtn = Menubutton(category_frame, text=f"Select {category}", relief=tk.RAISED, 
+                        bg="#212121", fg="white", activebackground="#404040")
+        menu = Menu(mbtn, tearoff=0, bg="#2b2b2b", fg="white", 
+                    activebackground="#404040", activeforeground="white")
+        mbtn.config(menu=menu)
+        
+        # Add items to dropdown with images
+        for name in items:
+            thumb = image_thumbnails.get(name)
+            display_name = name.replace("_", " ").title()
+            if thumb:
+                menu.add_command(
+                    label=display_name,
+                    image=thumb,
+                    compound="left",
+                    command=lambda n=name: app.set_selected_image_furniture(n)
+                )
+            else:
+                menu.add_command(
+                    label=display_name,
+                    command=lambda n=name: app.set_selected_image_furniture(n)
+                )
+        
+        mbtn.pack(pady=5, padx=5, fill="x")
+
+    # Add control buttons at the bottom
+    controls_frame = ctk.CTkFrame(furniture_tab)
+    controls_frame.pack(pady=10, padx=10, fill="x")
+
+    ctk.CTkLabel(controls_frame, text="Controls", font=("Arial", 12, "bold")).pack(pady=(5,0))
+
+    ctk.CTkButton(controls_frame, text="Rotate Selected",
+                command=app.rotate_selected_image).pack(pady=2, fill="x")
+    ctk.CTkButton(controls_frame, text="Delete Selected",
+                command=app.delete_selected_image).pack(pady=2, fill="x")
+    ctk.CTkButton(controls_frame, text="Zoom In (+)",
+                command=lambda: app.zoom_image(1.1)).pack(pady=2, fill="x")
+    ctk.CTkButton(controls_frame, text="Zoom Out (-)",
+                command=lambda: app.zoom_image(0.9)).pack(pady=2, fill="x")
 
 
-    ctk.CTkButton(furniture_tab, text="Rotate Selected", 
-                 command=app.rotate_selected_image).pack(pady=2)
-    ctk.CTkButton(furniture_tab, text="Delete Selected", 
-                 command=app.delete_selected_image).pack(pady=2)
-    ctk.CTkButton(furniture_tab, text="Zoom In (+)",
-                 command=lambda: app.zoom_image(1.1)).pack(pady=2)
-    ctk.CTkButton(furniture_tab, text="Zoom Out (-)", 
-                 command=lambda: app.zoom_image(0.9)).pack(pady=2)
 
     # === View Tab ===
     ctk.CTkButton(view_tab, text="Save Canvas", command=app.save_canvas).pack(pady=2)
