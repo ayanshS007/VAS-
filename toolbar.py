@@ -124,6 +124,11 @@ def setup_toolbar(app, root):
         
         mbtn.pack(pady=5, padx=5, fill="x")
 
+    
+
+
+
+
     # Add control buttons at the bottom
     controls_frame = ctk.CTkFrame(furniture_tab)
     controls_frame.pack(pady=10, padx=10, fill="x")
@@ -138,6 +143,13 @@ def setup_toolbar(app, root):
                 command=lambda: app.zoom_image(1.1)).pack(pady=2, fill="x")
     ctk.CTkButton(controls_frame, text="Zoom Out (-)",
                 command=lambda: app.zoom_image(0.9)).pack(pady=2, fill="x")
+
+
+    # Now add the flip buttons
+    ctk.CTkButton(controls_frame, text="Flip Horizontal",
+        command=app.flip_selected_image_horizontal).pack(pady=2, fill="x")
+    ctk.CTkButton(controls_frame, text="Flip Vertical",
+        command=app.flip_selected_image_vertical).pack(pady=2, fill="x")
 
 
 

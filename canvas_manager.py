@@ -643,6 +643,16 @@ class CanvasManager:
         
         return img.resize((new_width, new_height), Image.LANCZOS)
 
+    #FLIP
+    def flip_selected_image_horizontal(self):
+        if self.selected_image_item:
+            self.selected_image_item.flip_horizontal()
+
+    def flip_selected_image_vertical(self):
+        if self.selected_image_item:
+            self.selected_image_item.flip_vertical()
+
+
 
 
     # def resize_room(self, event, rect_id, label_id, handle_id):

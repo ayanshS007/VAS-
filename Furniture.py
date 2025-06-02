@@ -151,6 +151,21 @@ class Furniture:
         self.canvas.itemconfig(self.image_id, image=self.tk_image)
         self.update_handles_position()
 
+    #FLIP 
+    def flip_horizontal(self):
+        # Flip the original image left-right and update
+        self.original_image = self.original_image.transpose(Image.FLIP_LEFT_RIGHT)
+        self.update_image()
+        self.canvas.itemconfig(self.image_id, image=self.tk_image)
+        self.update_handles_position()
+
+    def flip_vertical(self):
+        # Flip the original image top-bottom and update
+        self.original_image = self.original_image.transpose(Image.FLIP_TOP_BOTTOM)
+        self.update_image()
+        self.canvas.itemconfig(self.image_id, image=self.tk_image)
+        self.update_handles_position()
+
 class GraphLayoutApp:
     def __init__(self, root):
         self.root = root
