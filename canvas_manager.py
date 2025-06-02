@@ -560,28 +560,51 @@ class CanvasManager:
                 self.canvas.itemconfig(self.selected_text_item, font=("Arial", self.text_font_size))
             # Add any other advanced features from your previous CanvasManager as needed.
     def insert_room_template(self, name, width_m, height_m):
-     x0, y0 = 100 + self.group_id_counter * 20, 100 + self.group_id_counter * 20
-     width_px = width_m / self.unit_scale[self.unit] * self.grid_spacing * self.zoom_level
-     height_px = height_m / self.unit_scale[self.unit] * self.grid_spacing * self.zoom_level
-     x1, y1 = x0 + width_px, y0 + height_px
+        x0, y0 = 100 + self.group_id_counter * 20, 100 + self.group_id_counter * 20
+        width_px = width_m / self.unit_scale[self.unit] * self.grid_spacing * self.zoom_level
+        height_px = height_m / self.unit_scale[self.unit] * self.grid_spacing * self.zoom_level
+        x1, y1 = x0 + width_px, y0 + height_px
 
-     # Unique tag for each room
-     group_tag = f"room_group_{self.group_id_counter}"
-     self.group_id_counter += 1
+        # Custom styles based on room name
+        fill_color = "#d0f0c0"  # Default color
+        if "shaft" in name.lower():
+            fill_color = "#808080"  # Grey color for shafts
 
-     # Draw rectangle and label, with same unique tag
-     rect = self.canvas.create_rectangle(x0, y0, x1, y1, fill="#d0f0c0", outline="black", tags=(group_tag,"room"))
-     label = self.canvas.create_text((x0 + x1) / 2, (y0 + y1) / 2,
-                                    text=f"{name}\n{width_m}×{height_m} m", font=("Arial", 10),
-                                    tags=(group_tag,))
+        group_tag = f"room_group_{self.group_id_counter}"
+        self.group_id_counter += 1
 
-     # Bind drag events to the unique group tag
-     self.canvas.tag_bind(group_tag, "<Button-1>", self.start_drag_room)
-     self.canvas.tag_bind(group_tag, "<B1-Motion>", self.drag_room)
-     self.canvas.tag_bind(group_tag, "<ButtonRelease-1>", self.end_drag_room)
+        # Create main rectangle
+        rect = self.canvas.create_rectangle(
+            x0, y0, x1, y1, 
+            fill=fill_color, 
+            outline="black", 
+            tags=(group_tag, "room")
+        )
 
-     # Add to undo stack
-     self.actions_stack.append([rect, label])
+        # Add diagonal lines for shafts
+        if "shaft" in name.lower():
+            self.canvas.create_line(x0, y0, x1, y1, fill="black", tags=(group_tag,))
+            self.canvas.create_line(x0, y1, x1, y0, fill="black", tags=(group_tag,))
+
+        # Create label with dimensions
+        label_text = f"{name}\n{width_m}×{height_m} {self.unit}"
+        label = self.canvas.create_text(
+            (x0 + x1) / 2, (y0 + y1) / 2,
+            text=label_text, 
+            font=("Arial", 10),
+            tags=(group_tag,)
+        )
+
+        # Bind drag events
+        self.canvas.tag_bind(group_tag, "<Button-1>", self.start_drag_room)
+        self.canvas.tag_bind(group_tag, "<B1-Motion>", self.drag_room)
+        self.canvas.tag_bind(group_tag, "<ButtonRelease-1>", self.end_drag_room)
+
+        # Add to undo stack
+        self.actions_stack.append([rect, label])
+        
+        # Return created elements if needed
+        return rect, label
 
 
     def start_drag_room(self, event):
