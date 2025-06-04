@@ -14,6 +14,26 @@ class CanvasManager:
         self.root = root
         self.root.title("Graph Paper Layout Tool")
 
+
+
+
+        # Layer Management System
+        self.layer_manager = {}  # {object_id: layer_number}
+        self.current_layer = 0   # default layer for new objects
+        self.max_layer = 0       # highest layer number used
+        self.selected_object = None  # currently selected object for layer operations
+        self.object_metadata = {}    # {object_id: {"type": "line/polygon/furniture/room/text", "group": group_ids}}
+        
+        # Selection visual feedback
+        self.selection_outline = None
+        self.selection_handles = []
+
+        # Keyboard shortcuts for layer operations:
+        self.root.bind("<Control-bracketright>", lambda e: self.bring_forward())  # Ctrl+]
+        self.root.bind("<Control-bracketleft>", lambda e: self.send_back())       # Ctrl+[
+        self.root.bind("<Escape>", lambda e: self.clear_selection())              # Esc
+
+
         self.zoom_level = 1.0
         self.zoom_step = 0.1
         self.canvas_width = CANVAS_WIDTH
@@ -61,7 +81,7 @@ class CanvasManager:
         self.selected_image_item = None
 
         # Canvas setup
-        self.canvas = tk.Canvas(root, width=self.canvas_width, height=self.canvas_height, bg="white")
+        self.canvas = tk.Canvas(root, width=self.canvas_width, height=self.canvas_height, bg="white",highlightthickness=0, borderwidth=0)
         self.canvas.pack(side=tk.RIGHT, expand=True, fill=tk.BOTH)
 
         left_panel = tk.Frame(self.root)
@@ -84,6 +104,165 @@ class CanvasManager:
 
 
         
+
+
+# Layer Management Methods
+    def assign_layer(self, object_id, layer=None):
+        """Assign a layer to an object"""
+        if layer is None:
+            layer = self.current_layer
+        self.layer_manager[object_id] = layer
+        if layer > self.max_layer:
+            self.max_layer = layer
+        self.update_visual_stacking()
+
+    def assign_layer_to_group(self, object_ids, layer=None):
+        """Assign same layer to multiple objects"""
+        if layer is None:
+            layer = self.current_layer
+        for obj_id in object_ids:
+            self.layer_manager[obj_id] = layer
+        if layer > self.max_layer:
+            self.max_layer = layer
+        self.update_visual_stacking()
+
+    def update_visual_stacking(self):
+        """Update visual stacking order based on layers"""
+        layers = {}
+        for obj_id, layer in self.layer_manager.items():
+            try:
+                if self.canvas.type(obj_id):
+                    if layer not in layers:
+                        layers[layer] = []
+                    layers[layer].append(obj_id)
+            except:
+                continue
+
+        # Reset stacking
+        for layer in sorted(layers.keys(), reverse=True):
+            for obj_id in layers[layer]:
+                self.canvas.tag_lower(obj_id)
+
+        # Restack from bottom up
+        for layer in sorted(layers.keys()):
+            for obj_id in layers[layer]:
+                self.canvas.tag_raise(obj_id)
+
+    def select_object(self, object_id):
+        """Select an object for layer operations"""
+        if object_id == self.selected_object:
+            return
+        self.clear_selection()
+        self.selected_object = object_id
+
+    def clear_selection(self):
+        """Clear current selection"""
+        self.selected_object = None
+
+    # Layer Operations
+    def bring_forward(self):
+        """Bring selected object forward in stacking order"""
+        if not self.selected_object:
+            return
+
+        current_layer = self.layer_manager[self.selected_object]
+        layers_above = [l for l in self.layer_manager.values() if l > current_layer]
+        new_layer = current_layer + 1 if not layers_above else min(layers_above) + 1
+        
+        self._update_object_layer(new_layer)
+
+    def send_back(self):
+        """Send selected object backward in stacking order"""
+        if not self.selected_object:
+            return
+
+        current_layer = self.layer_manager[self.selected_object]
+        layers_below = [l for l in self.layer_manager.values() if l < current_layer]
+        new_layer = current_layer - 1 if not layers_below else max(layers_below) - 1
+        new_layer = max(0, new_layer)
+        
+        self._update_object_layer(new_layer)
+
+    def _update_object_layer(self, new_layer):
+        """Internal method to update object layer"""
+        self.layer_manager[self.selected_object] = new_layer
+        if metadata := self.object_metadata.get(self.selected_object):
+            for obj in metadata.get("group", []):
+                self.layer_manager[obj] = new_layer
+        self.update_visual_stacking()
+
+    # Object Creation (Example)
+    def create_rectangle(self, x1, y1, x2, y2, **kwargs):
+        """Example object creation method"""
+        obj_id = self.canvas.create_rectangle(x1, y1, x2, y2, **kwargs)
+        self.assign_layer(obj_id)
+        self.object_metadata[obj_id] = {
+            "type": "rectangle",
+            "group": [obj_id]
+        }
+        return obj_id
+
+    # Selection Handling
+    def handle_click(self, event):
+        """Handle canvas click events"""
+        x, y = event.x, event.y
+        clicked = self.canvas.find_overlapping(x-2, y-2, x+2, y+2)
+        
+        if clicked:
+            for obj_id in reversed(clicked):
+                if "handle" not in self.canvas.gettags(obj_id):
+                    self.select_object(obj_id)
+                    return
+        self.clear_selection()
+
+    # Toolbar Setup
+    def setup_toolbar(self):
+        """Create layer control buttons"""
+        toolbar = tk.Frame(self.root)
+        toolbar.pack(side=tk.TOP, fill=tk.X)
+        
+        btn_bring_forward = tk.Button(toolbar, 
+            text="Bring Forward", 
+            command=self.bring_forward
+        )
+        btn_bring_forward.pack(side=tk.LEFT)
+        
+        btn_send_back = tk.Button(toolbar,
+            text="Send Back",
+            command=self.send_back
+        )
+        btn_send_back.pack(side=tk.LEFT)
+
+    # Debug Utilities
+    def debug_layers(self):
+        """Print layer information to console"""
+        print("=== LAYER DEBUG ===")
+        for obj_id, layer in sorted(self.layer_manager.items(), key=lambda x: x[1]):
+            try:
+                obj_type = self.object_metadata.get(obj_id, {}).get("type", "unknown")
+                print(f"ID {obj_id}: Layer {layer} ({obj_type})")
+            except:
+                print(f"ID {obj_id}: INVALID")
+        print("===================")
+
+    def get_selected_object_info(self):
+        """Get information about the currently selected object"""
+        if not self.selected_object:
+            return None
+        
+        layer = self.layer_manager.get(self.selected_object, 0)
+        obj_type = "unknown"
+        
+        if self.selected_object in self.object_metadata:
+            obj_type = self.object_metadata[self.selected_object].get("type", "unknown")
+        
+        return {
+            "id": self.selected_object,
+            "layer": layer,
+            "type": obj_type
+        }
+
+
 
 
         # Sidebar for image furniture
@@ -133,9 +312,9 @@ class CanvasManager:
         if self.drawing_enabled:
             if not self.first_point:
                 self.first_point = (x, y)
-                # Create point at first click
                 point = self.canvas.create_oval(x-0.5, y-0.5, x+0.5, y+0.5, fill="black")
-                # Save just the point id to stack for undo
+                self.assign_layer(point, self.current_layer)
+                self.object_metadata[point] = {"type": "point", "group": []}
             else:
                 x0, y0 = self.first_point
                 x1, y1 = event.x, event.y
@@ -143,45 +322,44 @@ class CanvasManager:
                 dy = y1 - y0
                 mouse_length = math.hypot(dx, dy)
 
+                width = 4 if self.line_style == "bold" else 2
+                dash = (4, 2) if self.line_style == "dashed" else None
+
+                line = self.canvas.create_line(x0, y0, x1, y1, fill=self.line_color, width=width, dash=dash)
+                label_text, mid_x, mid_y = get_distance_label(x0, y0, x1, y1, self.unit, self.zoom_level)
+                label = self.canvas.create_text(mid_x, mid_y - 10, text=label_text, font=("Arial", 8))
+                point = self.canvas.create_oval(x1-0.5, y1-0.5, x1+0.5, y1+0.5, fill="black")
+                
+                # Assign same layer to line group
+                group_objects = [line, label, point]
+                self.assign_layer_to_group(group_objects, self.current_layer)
+                
+                # Store metadata
+                for obj in group_objects:
+                    self.object_metadata[obj] = {"type": "line", "group": group_objects}
+                
+                self.actions_stack.append(group_objects)
+
                 # Show distance input like AutoCAD
                 if mouse_length > 0:
                     self.temp_direction = (dx / mouse_length, dy / mouse_length)
                     self.temp_origin = (x0, y0)
 
                     if self.temp_entry:
-                       self.temp_entry.destroy()
+                        self.temp_entry.destroy()
 
                     self.temp_entry = tk.Entry(self.root)
                     self.temp_entry.place(x=event.x_root - 30, y=event.y_root - 10, width=60)
                     self.temp_entry.focus()
                     self.temp_entry.bind("<Return>", self.finish_line_with_distance)
 
-                    # Also store freeform points for potential closed shape detection
-                    self.freeform_points.append((x0, y0))
-                    self.freeform_points.append((x1, y1))
-
-                    # If enough points, check if shape is closed
-                    if len(self.freeform_points) >= 3 and math.dist(self.freeform_points[0], self.freeform_points[-1]) < 10:
-                                   # At least 3 lines
-                        if math.dist(self.freeform_points[0], self.freeform_points[-1]) < 10:
-                            polygon_points = [self.freeform_points[0]]
-                            for pt in self.freeform_points[1:]:
-                                if math.dist(pt, polygon_points[-1]) > 1:
-                                    polygon_points.append(pt)
-
-                            flat = [coord for pt in polygon_points for coord in pt]
-                            polygon_id = self.canvas.create_polygon(flat, outline=self.line_color, fill=self.fill_color, width=2, tags=("closed_shape",))
-                            self.actions_stack.append([polygon_id])
-                            self.freeform_points.clear()
-                            self.fill_color = ""
-
                 self.first_point = None
                 if self.current_preview:
                     self.canvas.delete(self.current_preview)
                     self.current_preview = None
                 if self.current_line_label:
-                   self.canvas.delete(self.current_line_label)
-                   self.current_line_label = None
+                    self.canvas.delete(self.current_line_label)
+                    self.current_line_label = None
 
         elif self.polygon_mode:
             if self.polygon_points:
@@ -189,58 +367,121 @@ class CanvasManager:
                     self.finish_polygon()
                     return
                 x0, y0 = self.polygon_points[-1]
-                line = self.canvas.create_line(x0, y0, x, y, fill="green", width=2)
+                line = self.canvas.create_line(x0, y0, x, y, fill="black", width=2)
+                point = self.canvas.create_oval(x-0.5, y-0.5, x+0.5, y+0.5, fill="black")
+            
+                # Assign layers
+                self.assign_layer(line, self.current_layer)
+                self.assign_layer(point, self.current_layer)
+                
+                # Store metadata
+                self.object_metadata[line] = {"type": "polygon_line", "group": [line]}
+                self.object_metadata[point] = {"type": "polygon_point", "group": [point]}
+                
                 self.actions_stack.append([line])
-            self.polygon_points.append((x, y))
-            point = self.canvas.create_oval(x-0.5, y-0.5, x+0.5, y+0.5, fill="green")
-            self.actions_stack.append([point])
+                self.actions_stack.append([point])
+                self.polygon_points.append((x, y))
+            else:
+                # First point of polygon
+                self.polygon_points.append((x, y))
+                point = self.canvas.create_oval(x-0.5, y-0.5, x+0.5, y+0.5, fill="black")
+                self.assign_layer(point, self.current_layer)
+                self.object_metadata[point] = {"type": "polygon_point", "group": [point]}
+                self.actions_stack.append([point])
 
         elif self.selected_image_furniture:
-            # from Furniture import Furniture
-            # image_item = Furniture(self.canvas, self.selected_image_furniture, x, y)
             from Furniture import Furniture, find_image_path
             image_path = find_image_path(self.selected_image_furniture)
             if image_path:
-               image_item = Furniture(self.canvas, image_path, x, y, self.select_image_item)
-               self.image_furniture_items.append(image_item)
-               self.select_image_item(image_item)
-               self.selected_image_furniture = None
+                image_item = Furniture(self.canvas, image_path, x, y, self.select_image_item)
+                self.image_furniture_items.append(image_item)
+                
+                furniture_canvas_id = image_item.image_id
 
-            self.image_furniture_items.append(image_item)
-            self.select_image_item(image_item)
-            return
+                # Assign layer to furniture - use the actual canvas object ID
+                self.assign_layer(furniture_canvas_id, self.current_layer)
+                self.object_metadata[furniture_canvas_id] = {
+                    "type": "furniture", 
+                    "group": [furniture_canvas_id],
+                    "furniture_object": image_item  # Store reference to furniture object
+                }
+                
+                self.select_image_item(image_item)
+                self.selected_image_furniture = None
 
-            
+                # Force immediate layer update
+                self.update_visual_stacking()
+
+        elif self.text_insertion_mode:
+            text = simpledialog.askstring("Insert Text", "Enter your text:")
+            if text:
+                text_id = self.canvas.create_text(x, y, text=text, font=("Arial", self.text_font_size), anchor="nw")
+                
+                # Assign layer
+                self.assign_layer(text_id, self.current_layer)
+                self.object_metadata[text_id] = {"type": "text", "group": [text_id]}
+                
+                self.canvas.tag_bind(text_id, "<Button-1>", self.select_text_item)
+                self.canvas.tag_bind(text_id, "<B1-Motion>", self.drag_text)
+                self.canvas.tag_bind(text_id, "<Button-3>", self.resize_text_popup)
+                self.actions_stack.append([text_id])
+
         elif self.click_callback:
             self.click_callback(event.x, event.y)
+            
         else:
-            # Check if clicked near any canvas item to start dragging
+            # OBJECT SELECTION LOGIC - This should now be reached!
             clicked_items = self.canvas.find_overlapping(x-5, y-5, x+5, y+5)
             if clicked_items:
-                # Pick the topmost item under cursor
-                self.dragging_item = clicked_items[-1]
-                self.drag_start_pos = (x, y)
-                # Bind mouse motion and release for dragging
-                self.canvas.bind("<B1-Motion>", self.handle_drag)
-                self.canvas.bind("<ButtonRelease-1>", self.handle_release)
-            else:
-                # self.dragging_item = None
-                clicked_items = self.canvas.find_overlapping(x-5, y-5, x+5, y+5)
-                if clicked_items:
-                 top_item = clicked_items[-1]
-                 tags = self.canvas.gettags(top_item)
+                # Find the topmost clickable item (not selection outline)
+                selected_item = None
+                for item_id in reversed(clicked_items):
+                    tags = self.canvas.gettags(item_id)
+                    if "selection_outline" not in tags and "handle" not in tags:
+                        selected_item = item_id
+                        break
+                
+                if selected_item:
+                    self.select_object(selected_item)
+                    print(f"Selected object: {selected_item}")  # Debug print
+                    return
+            
+            # If no object was clicked, clear selection
+            self.clear_selection()
+            print("No object selected - cleared selection")  # Debug print
 
-                 if "room_handle" in tags:
-                  self.resizing_room_id = top_item
-                  self.canvas.bind("<B1-Motion>", self.resize_room_drag)
-                  return
+            # Check if clicked near any canvas item to start dragging
+            if clicked_items:
+                # Handle room resizing and dragging
+                for item_id in reversed(clicked_items):
+                    tags = self.canvas.gettags(item_id)
+                    if "room_handle" in tags:
+                        self.resizing_room_id = item_id
+                        self.canvas.bind("<B1-Motion>", self.resize_room_drag)
+                        return
+                    
+                    if "draggable" in tags or "room" in tags:
+                        self.dragging_item = item_id
+                        self.drag_start_pos = (x, y)
+                        self.canvas.bind("<B1-Motion>", self.handle_drag)
+                        self.canvas.bind("<ButtonRelease-1>", self.handle_release)
+                        return
 
-                 if "draggable" in tags or "room" in tags:
-                  self.dragging_item = top_item
-                  self.drag_start_pos = (x, y)
-                  self.canvas.bind("<B1-Motion>", self.handle_drag)
-                  self.canvas.bind("<ButtonRelease-1>", self.handle_release)
-                 return
+    def debug_canvas_items(self):
+        """Debug method to print all canvas items and their metadata"""
+        print("=== CANVAS DEBUG INFO ===")
+        print(f"Total canvas items: {len(self.canvas.find_all())}")
+        print(f"Layer manager items: {len(self.layer_manager)}")
+        print(f"Metadata items: {len(self.object_metadata)}")
+        print(f"Selected object: {self.selected_object}")
+        
+        for item_id in self.canvas.find_all():
+            item_type = self.canvas.type(item_id)
+            layer = self.layer_manager.get(item_id, "No layer")
+            metadata = self.object_metadata.get(item_id, "No metadata")
+            print(f"Item {item_id}: {item_type}, Layer: {layer}, Meta: {metadata}")
+        print("========================")
+
 
     def finish_line_with_distance(self, event):
         try:
@@ -419,12 +660,23 @@ class CanvasManager:
             return
         flat = [coord for pt in self.polygon_points for coord in pt]
         polygon_id = self.canvas.create_polygon(flat, outline="green", fill="", width=2)
+
         area = calculate_polygon_area(self.polygon_points, self.unit)
         perimeter = calculate_polygon_perimeter(self.polygon_points, self.unit)
+
         cx = sum(x for x, _ in self.polygon_points) / len(self.polygon_points)
         cy = sum(y for _, y in self.polygon_points) / len(self.polygon_points)
+
         label = self.canvas.create_text(cx, cy, text=f"Area: {area:.2f} {self.unit}²\nPerimeter: {perimeter:.2f} {self.unit}", font=("Arial", 9))
-        self.actions_stack.append([polygon_id, label])
+        # Assign layers to polygon group
+        group_objects = [polygon_id, label]
+        self.assign_layer_to_group(group_objects, self.current_layer)
+        
+        # Store metadata
+        for obj in group_objects:
+            self.object_metadata[obj] = {"type": "polygon", "group": group_objects}
+        
+        self.actions_stack.append(group_objects)
         self.polygon_points = []
 
     def clear_canvas(self):
@@ -432,12 +684,32 @@ class CanvasManager:
         self.actions_stack.clear()
         self.image_furniture_items.clear()
         self.selected_image_item = None
+        
+        # Clear layer management
+        self.layer_manager.clear()
+        self.object_metadata.clear()
+        self.selected_object = None
+        self.current_layer = 0
+        self.max_layer = 0
+        self.clear_selection()
+        
         self.draw_grid()
 
     def undo(self):
         if self.actions_stack:
-            for item in self.actions_stack.pop():
+            items_to_remove = self.actions_stack.pop()
+            for item in items_to_remove:
                 self.canvas.delete(item)
+                # Clean up layer management
+                if item in self.layer_manager:
+                    del self.layer_manager[item]
+                if item in self.object_metadata:
+                    del self.object_metadata[item]
+            
+            # Clear selection if selected object was deleted
+            if self.selected_object in items_to_remove:
+                self.clear_selection()
+
 
     def save_canvas(self):
         filetypes = [
@@ -540,10 +812,17 @@ class CanvasManager:
         if text:
             x, y = event.x, event.y
             text_id = self.canvas.create_text(x, y, text=text, font=("Arial", self.text_font_size), anchor="nw")
+            # Assign layer
+            self.assign_layer(text_id, self.current_layer)
+            self.object_metadata[text_id] = {"type": "text", "group": [text_id]}
+            
             self.canvas.tag_bind(text_id, "<Button-1>", self.select_text_item)
             self.canvas.tag_bind(text_id, "<B1-Motion>", self.drag_text)
-            self.canvas.tag_bind(text_id, "<Double-Button-1>", self.resize_text_popup)
+            self.canvas.tag_bind(text_id, "<Button-3>", self.resize_text_popup)
             self.actions_stack.append([text_id])
+
+
+            
 
     def select_text_item(self, event):
         self.selected_text_item = self.canvas.find_closest(event.x, event.y)[0]
@@ -594,6 +873,12 @@ class CanvasManager:
             font=("Arial", 10),
             tags=(group_tag,)
         )
+        group_objects = [rect, label]
+        self.assign_layer_to_group(group_objects, self.current_layer)
+        
+        # Store metadata
+        for obj in group_objects:
+            self.object_metadata[obj] = {"type": "room", "group": group_objects}
 
         # Bind drag events
         self.canvas.tag_bind(group_tag, "<Button-1>", self.start_drag_room)

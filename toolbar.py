@@ -63,6 +63,45 @@ def setup_toolbar(app, root):
                      values=list(app.unit_scale.keys()), 
                      command=app.change_unit).pack(pady=2)
     ctk.CTkButton(edit_tab, text="Reset Mode", command=app.reset_modes).pack(pady=2)
+    
+        # === Layer Management Section ===
+    layer_frame = ctk.CTkFrame(edit_tab)
+    layer_frame.pack(pady=10, padx=10, fill="x")
+
+    ctk.CTkLabel(layer_frame, text="Layer Management", font=("Arial", 12, "bold")).pack(pady=(5,0))
+
+    ctk.CTkButton(layer_frame, text="Bring Forward", 
+                command=app.bring_forward).pack(pady=2, fill="x")
+
+    ctk.CTkButton(layer_frame, text="Send Back", 
+                command=app.send_back).pack(pady=2, fill="x")
+
+    ctk.CTkButton(layer_frame, text="Clear Selection", 
+                command=app.clear_selection).pack(pady=2, fill="x")
+
+    # Layer info display
+    app.layer_info_label = ctk.CTkLabel(layer_frame, text="No object selected", 
+                                    font=("Arial", 10))
+    app.layer_info_label.pack(pady=5)
+
+    # Add function to update layer info
+    def update_layer_info():
+        info = app.get_selected_object_info()
+        if info:
+            text = f"Selected: {info['type']} (Layer {info['layer']})"
+            app.layer_info_label.configure(text=text)
+        else:
+            app.layer_info_label.configure(text="No object selected")
+        
+        app.root.after(100, update_layer_info)  # Update every 100ms
+
+    # Start the update loop
+    update_layer_info()
+
+    # Add this in the edit_tab section after the existing layer buttons
+    ctk.CTkButton(layer_frame, text="Debug Layers", 
+              command=app.debug_layers).pack(pady=2, fill="x")
+
 
 
     # === Furniture Tab ===
