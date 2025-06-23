@@ -1,6 +1,4 @@
-import math
-from config import UNIT_SCALE, GRID_SPACING
-
+# drawing_helpers.py
 import math
 from config import UNIT_SCALE, GRID_SPACING
 
@@ -17,9 +15,9 @@ def get_distance_label(x0, y0, x1, y1, unit, zoom_level=1.0):
 
     # Choose unit suffix
     unit_suffix_map = {
-        "meters": "m",
-        "feet": "ft",
-        "inches": "in",
+        "m": "m",
+        "ft": "ft",
+        "in": "in",
         # "centimeters": "cm",
         # "millimeters": "mm"
     }
